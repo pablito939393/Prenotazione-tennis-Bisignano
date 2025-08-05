@@ -1,0 +1,126 @@
+# Prenotazione-tennis-Bisignano
+Segna il tuo nome e prenota il campo! Ogni giocatore ha a disposizione fino a due ore al giorno
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Prenotazioni Campo da Tennis</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    td.booked {
+      background-color: #a5d6a7;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+  <h1>Calendario Prenotazioni Campo da Tennis</h1>
+  <table id="calendar"></table>
+
+  <script>
+    const giorni = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
+    const ore = Array.from({length: 16}, (_, i) => i + 8); // 8-23
+
+    const table = document.getElementById('calendar');
+    const today = new Date();
+    const settimana = getSettimana(today);
+
+    function getSettimana(date) {
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1); // lunedì
+      const lunedi = new Date(date.setDate(diff));
+      return Array.from({length: 7}, (_, i) => {
+        const d = new Date(lunedi);
+        d.setDate(lunedi.getDate() + i);
+        return d.toISOString().slice(0,10);
+      });
+    }
+
+    function loadPrenotazioni() {
+      const salvate = JSON.parse(localStorage.getItem('prenotazioni') || '{}');
+      const dataSalvata = localStorage.getItem('dataSettimana');
+      if (dataSalvata !== settimana[0]) {
+        localStorage.removeItem('prenotazioni');
+        localStorage.setItem('dataSettimana', settimana[0]);
+        return {};
+      }
+      return salvate;
+    }
+
+    function salvaPrenotazioni(p) {
+      localStorage.setItem('prenotazioni', JSON.stringify(p));
+      localStorage.setItem('dataSettimana', settimana[0]);
+    }
+
+    let prenotazioni = loadPrenotazioni();
+
+    function contaOre(nome, data) {
+      return Object.entries(prenotazioni).filter(([key, value]) => value === nome && key.startsWith(data)).length;
+    }
+
+    function creaTabella() {
+      const thead = document.createElement('thead');
+      const header = document.createElement('tr');
+      header.appendChild(document.createElement('th')); // vuoto iniziale
+      settimana.forEach((d, i) => {
+        const th = document.createElement('th');
+        th.textContent = giorni[i] + ' (' + d.slice(5) + ')';
+        header.appendChild(th);
+      });
+      thead.appendChild(header);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      ore.forEach(h => {
+        const row = document.createElement('tr');
+        const ora = document.createElement('td');
+        ora.textContent = h + ':00';
+        row.appendChild(ora);
+        settimana.forEach(data => {
+          const key = data + '_' + h;
+          const cella = document.createElement('td');
+          if (prenotazioni[key]) {
+            cella.textContent = prenotazioni[key];
+            cella.classList.add('booked');
+          } else {
+            cella.addEventListener('click', () => {
+              const nome = prompt('Inserisci il tuo nome (max 2h al giorno):');
+              if (!nome) return;
+              if (contaOre(nome, data) >= 2) {
+                alert('Hai già prenotato 2 ore in questa giornata.');
+                return;
+              }
+              prenotazioni[key] = nome;
+              salvaPrenotazioni(prenotazioni);
+              cella.textContent = nome;
+              cella.classList.add('booked');
+              cella.replaceWith(cella.cloneNode(true)); // rimuove evento
+            });
+          }
+          row.appendChild(cella);
+        });
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+    }
+
+    creaTabella();
+  </script>
+</body>
+</html>
