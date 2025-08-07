@@ -1,140 +1,55 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Prenotazioni Campo Tennis</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 20px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      text-align: center;
-      padding: 8px;
-    }
-    th {
-      background-color: #eee;
-    }
-    input {
-      width: 90%;
-    }
-    td.prenotato {
-      background-color: #d1ffd1;
-    }
-  </style>
-</head>
-<body>
-  <h1>Prenotazioni Campo Tennis - Bisignano</h1>
-  <p>Massimo 2 ore al giorno per utente. Le prenotazioni si resettano ogni lunedì.</p>
+function creaTabella(prenotazioni) {
+  tableBody.innerHTML = "";
+  orari.forEach(orario => {
+    const row = document.createElement("tr");
+    const oraCell = document.createElement("td");
+    oraCell.textContent = orario;
+    row.appendChild(oraCell);
 
-  <table id="tabella">
-    <thead>
-      <tr>
-        <th>Orario</th>
-        <th>Lunedì</th>
-        <th>Martedì</th>
-        <th>Mercoledì</th>
-        <th>Giovedì</th>
-        <th>Venerdì</th>
-        <th>Sabato</th>
-        <th>Domenica</th>
-      </tr>
-    </thead>
-    <tbody>
-      <!-- Riga per ogni ora -->
-      <!-- Verrà generato via JS -->
-    </tbody>
-  </table>
+    giorni.forEach(giorno => {
+      const cell = document.createElement("td");
+      const pren = prenotazioni?.[giorno]?.[orario] || "";
 
-  <script type="module">
-    // Firebase config (dal tuo progetto)
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
+      if (pren) {
+        cell.textContent = pren;
+        cell.classList.add("prenotato");
+      } else {
+        const input = document.createElement("input");
+        input.placeholder = "Nome";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCvd63i4yBCsRPntGrXVsxUbojG3NP6Ag4",
-      authDomain: "prenotazioni-tennis-bisigano.firebaseapp.com",
-      databaseURL: "https://prenotazioni-tennis-bisigano-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "prenotazioni-tennis-bisigano",
-      storageBucket: "prenotazioni-tennis-bisigano.appspot.com",
-      messagingSenderId: "256615773750",
-      appId: "1:256615773750:web:494813376350942bf18a97"
-    };
+        const confermaBtn = document.createElement("button"); // AGGIUNTA
+        confermaBtn.textContent = "Conferma"; // AGGIUNTA
+        confermaBtn.style.marginTop = "4px"; // AGGIUNTA
+        confermaBtn.style.fontSize = "12px"; // AGGIUNTA
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+        async function prenota() {
+          const nome = input.value.trim();
+          if (!nome) return;
 
-    const giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
-    const orari = Array.from({length: 16}, (_, i) => `${String(i+8).padStart(2,'0')}:00`);
-    const tableBody = document.querySelector("#tabella tbody");
-
-    const oggi = new Date();
-    const lunedi = new Date(oggi.setDate(oggi.getDate() - oggi.getDay() + 1));
-    const settimanaKey = `${lunedi.getFullYear()}-${String(lunedi.getMonth()+1).padStart(2,'0')}-${String(lunedi.getDate()).padStart(2,'0')}`;
-
-    function creaTabella(prenotazioni) {
-      tableBody.innerHTML = "";
-      orari.forEach(orario => {
-        const row = document.createElement("tr");
-        const oraCell = document.createElement("td");
-        oraCell.textContent = orario;
-        row.appendChild(oraCell);
-
-        giorni.forEach(giorno => {
-          const cell = document.createElement("td");
-          const pren = prenotazioni?.[giorno]?.[orario] || "";
-
-          if (pren) {
-            cell.textContent = pren;
-            cell.classList.add("prenotato");
-          } else {
-            const input = document.createElement("input");
-            input.placeholder = "Nome";
-            input.addEventListener("keydown", async e => {
-              if (e.key === "Enter") {
-                const nome = input.value.trim();
-                if (!nome) return;
-
-                const count = contaPrenotazioni(prenotazioni, giorno, nome);
-                if (count >= 2) {
-                  alert("Massimo 2 ore al giorno per utente.");
-                  return;
-                }
-
-                const cellRef = ref(db, `prenotazioni/${settimanaKey}/${giorno}/${orario}`);
-                await set(cellRef, nome);
-              }
-            });
-            cell.appendChild(input);
+          const count = contaPrenotazioni(prenotazioni, giorno, nome);
+          if (count >= 2) {
+            alert("Massimo 2 ore al giorno per utente.");
+            return;
           }
 
-          row.appendChild(cell);
+          const cellRef = ref(db, `prenotazioni/${settimanaKey}/${giorno}/${orario}`);
+          await set(cellRef, nome);
+        }
+
+        input.addEventListener("keydown", e => {
+          if (e.key === "Enter") prenota();
         });
+        confermaBtn.addEventListener("click", prenota); // AGGIUNTA
 
-        tableBody.appendChild(row);
-      });
-    }
+        const contenitore = document.createElement("div"); // AGGIUNTA
+        contenitore.appendChild(input); // AGGIUNTA
+        contenitore.appendChild(confermaBtn); // AGGIUNTA
+        cell.appendChild(contenitore); // AGGIUNTA
+      }
 
-    function contaPrenotazioni(data, giorno, nome) {
-      if (!data?.[giorno]) return 0;
-      return Object.values(data[giorno]).filter(n => n === nome).length;
-    }
+      row.appendChild(cell);
+    });
 
-    function aggiorna() {
-      const prenRef = ref(db, `prenotazioni/${settimanaKey}`);
-      onValue(prenRef, snapshot => {
-        creaTabella(snapshot.val());
-      });
-    }
-
-    aggiorna();
-  </script>
-</body>
-</html>
+    tableBody.appendChild(row);
+  });
+}
