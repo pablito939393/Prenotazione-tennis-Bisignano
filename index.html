@@ -1,197 +1,64 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8">
-  <title>Prenotazioni Campo da Tennis</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-bottom: 100px; /* spazio per il popup */
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
-      cursor: pointer;
-    }
-    th {
-      background-color: #f0f0f0;
-    }
-    td.booked {
-      background-color: #a5d6a7;
-      cursor: default;
-    }
+import { useState } from "react";
+import { ref, set } from "firebase/database";
+import { database } from "@/lib/firebase";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
-    #prenotaBox {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #fff;
-      border-top: 1px solid #ccc;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-      padding: 15px;
-      display: none;
-      flex-direction: column;
-      gap: 10px;
-    }
+export default function PrenotazioneCampo() {
+  const [nome, setNome] = useState("");
+  const [data, setData] = useState("");
+  const [orario, setOrario] = useState("");
 
-    #prenotaBox input {
-      font-size: 16px;
-      padding: 8px;
-    }
+  const prenota = async () => {
+    if (!nome || !data || !orario) return alert("Compila tutti i campi");
 
-    #prenotaBox button {
-      font-size: 16px;
-      padding: 10px;
-      background-color: #4caf50;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-
-    #prenotaBox button:hover {
-      background-color: #45a049;
-    }
-  </style>
-</head>
-<body>
-  <h1>Calendario Prenotazioni Campo da Tennis</h1>
-  <table id="calendar"></table>
-
-  <!-- Box per inserire nome -->
-  <div id="prenotaBox">
-    <label for="nomeInput">Inserisci il tuo nome (max 2h al giorno):</label>
-    <input id="nomeInput" type="text" placeholder="Nome" autocomplete="off" />
-    <button id="confermaBtn">Conferma Prenotazione</button>
-  </div>
-
-  <script>
-    const giorni = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
-    const ore = Array.from({length: 16}, (_, i) => i + 8); // 8-23
-
-    const table = document.getElementById('calendar');
-    const today = new Date();
-    const settimana = getSettimana(today);
-
-    function getSettimana(date) {
-      const day = date.getDay();
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1); // lunedì
-      const lunedi = new Date(date.setDate(diff));
-      return Array.from({length: 7}, (_, i) => {
-        const d = new Date(lunedi);
-        d.setDate(lunedi.getDate() + i);
-        return d.toISOString().slice(0,10);
+    const chiave = `${data}_${orario.replace(":", "-")}`;
+    try {
+      await set(ref(database, "prenotazioni/" + chiave), {
+        nome,
+        data,
+        orario,
       });
+      alert("Prenotazione confermata!");
+      setNome("");
+      setData("");
+      setOrario("");
+    } catch (error) {
+      console.error("Errore nella prenotazione:", error);
+      alert("Errore nella prenotazione.");
     }
+  };
 
-    function loadPrenotazioni() {
-      const salvate = JSON.parse(localStorage.getItem('prenotazioni') || '{}');
-      const dataSalvata = localStorage.getItem('dataSettimana');
-      if (dataSalvata !== settimana[0]) {
-        localStorage.removeItem('prenotazioni');
-        localStorage.setItem('dataSettimana', settimana[0]);
-        return {};
-      }
-      return salvate;
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      prenota();
     }
+  };
 
-    function salvaPrenotazioni(p) {
-      localStorage.setItem('prenotazioni', JSON.stringify(p));
-      localStorage.setItem('dataSettimana', settimana[0]);
-    }
-
-    let prenotazioni = loadPrenotazioni();
-
-    function contaOre(nome, data) {
-      return Object.entries(prenotazioni).filter(([key, value]) => value === nome && key.startsWith(data)).length;
-    }
-
-    // Modal elementi
-    const prenotaBox = document.getElementById('prenotaBox');
-    const nomeInput = document.getElementById('nomeInput');
-    const confermaBtn = document.getElementById('confermaBtn');
-
-    let cellaCorrente = null;
-    let chiaveCorrente = null;
-    let dataCorrente = null;
-
-    function mostraBoxPrenotazione(cella, data, ora) {
-      cellaCorrente = cella;
-      chiaveCorrente = data + '_' + ora;
-      dataCorrente = data;
-
-      prenotaBox.style.display = 'flex';
-      nomeInput.value = '';
-      nomeInput.focus();
-    }
-
-    function confermaPrenotazione() {
-      const nome = nomeInput.value.trim();
-      if (!nome) return;
-
-      if (contaOre(nome, dataCorrente) >= 2) {
-        alert('Hai già prenotato 2 ore in questa giornata.');
-        return;
-      }
-
-      prenotazioni[chiaveCorrente] = nome;
-      salvaPrenotazioni(prenotazioni);
-      cellaCorrente.textContent = nome;
-      cellaCorrente.classList.add('booked');
-      cellaCorrente.replaceWith(cellaCorrente.cloneNode(true)); // rimuove evento
-      prenotaBox.style.display = 'none';
-    }
-
-    confermaBtn.addEventListener('click', confermaPrenotazione);
-    nomeInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        confermaPrenotazione();
-      }
-    });
-
-    function creaTabella() {
-      const thead = document.createElement('thead');
-      const header = document.createElement('tr');
-      header.appendChild(document.createElement('th')); // vuoto iniziale
-      settimana.forEach((d, i) => {
-        const th = document.createElement('th');
-        th.textContent = giorni[i] + ' (' + d.slice(5) + ')';
-        header.appendChild(th);
-      });
-      thead.appendChild(header);
-      table.appendChild(thead);
-
-      const tbody = document.createElement('tbody');
-      ore.forEach(h => {
-        const row = document.createElement('tr');
-        const ora = document.createElement('td');
-        ora.textContent = h + ':00';
-        row.appendChild(ora);
-        settimana.forEach(data => {
-          const key = data + '_' + h;
-          const cella = document.createElement('td');
-          if (prenotazioni[key]) {
-            cella.textContent = prenotazioni[key];
-            cella.classList.add('booked');
-          } else {
-            cella.addEventListener('click', () => {
-              mostraBoxPrenotazione(cella, data, h);
-            });
-          }
-          row.appendChild(cella);
-        });
-        tbody.appendChild(row);
-      });
-      table.appendChild(tbody);
-    }
-
-    creaTabella();
-  </script>
-</body>
-</html>
+  return (
+    <div className="max-w-md mx-auto p-6 space-y-4 bg-white shadow-xl rounded-2xl">
+      <h2 className="text-xl font-bold text-center">Prenota il campo</h2>
+      <Input
+        placeholder="Nome"
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <Input
+        type="date"
+        value={data}
+        onChange={(e) => setData(e.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <Input
+        type="time"
+        value={orario}
+        onChange={(e) => setOrario(e.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <Button className="w-full" onClick={prenota}>
+        Conferma prenotazione
+      </Button>
+    </div>
+  );
+}
