@@ -1,64 +1,62 @@
-import { useState } from "react";
-import { ref, set } from "firebase/database";
-import { database } from "@/lib/firebase";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+'use client'
 
-export default function PrenotazioneCampo() {
-  const [nome, setNome] = useState("");
-  const [data, setData] = useState("");
-  const [orario, setOrario] = useState("");
+import { useState } from 'react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { ref, set } from 'firebase/database'
+import { db } from '@/lib/firebase'
 
-  const prenota = async () => {
-    if (!nome || !data || !orario) return alert("Compila tutti i campi");
+export default function Prenotazione() {
+  const [nome, setNome] = useState('')
+  const [data, setData] = useState('')
+  const [orario, setOrario] = useState('')
 
-    const chiave = `${data}_${orario.replace(":", "-")}`;
-    try {
-      await set(ref(database, "prenotazioni/" + chiave), {
-        nome,
-        data,
-        orario,
-      });
-      alert("Prenotazione confermata!");
-      setNome("");
-      setData("");
-      setOrario("");
-    } catch (error) {
-      console.error("Errore nella prenotazione:", error);
-      alert("Errore nella prenotazione.");
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      prenota();
-    }
-  };
+  function prenota() {
+    if (!nome || !data || !orario) return
+    const key = `${data}_${orario.replace(':', '-')}`
+    set(ref(db, 'prenotazioni/' + key), nome)
+      .then(() => {
+        alert('Prenotazione effettuata!')
+        setNome('')
+        setData('')
+        setOrario('')
+      })
+      .catch((error) => {
+        alert('Errore: ' + error.message)
+      })
+  }
 
   return (
-    <div className="max-w-md mx-auto p-6 space-y-4 bg-white shadow-xl rounded-2xl">
-      <h2 className="text-xl font-bold text-center">Prenota il campo</h2>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        prenota()
+      }}
+      className="grid gap-4"
+    >
       <Input
         placeholder="Nome"
         value={nome}
         onChange={(e) => setNome(e.target.value)}
-        onKeyDown={handleKeyDown}
+        required
       />
       <Input
         type="date"
         value={data}
         onChange={(e) => setData(e.target.value)}
-        onKeyDown={handleKeyDown}
+        required
       />
       <Input
         type="time"
         value={orario}
         onChange={(e) => setOrario(e.target.value)}
-        onKeyDown={handleKeyDown}
+        required
       />
-      <Button className="w-full" onClick={prenota}>
+      
+      {/* Bottone per Android o clic */}
+      <Button type="submit" className="w-full">
         Conferma prenotazione
       </Button>
-    </div>
-  );
+    </form>
+  )
 }
