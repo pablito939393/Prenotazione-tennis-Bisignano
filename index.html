@@ -1,55 +1,185 @@
-function creaTabella(prenotazioni) {
-  tableBody.innerHTML = "";
-  orari.forEach(orario => {
-    const row = document.createElement("tr");
-    const oraCell = document.createElement("td");
-    oraCell.textContent = orario;
-    row.appendChild(oraCell);
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Prenotazioni Campo Tennis</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      text-align: center;
+      padding: 8px;
+    }
+    th {
+      background-color: #eee;
+    }
+    input {
+      width: 90%;
+    }
+    td.prenotato {
+      background-color: #d1ffd1;
+    }
+  </style>
+</head>
+<body>
+  <h1>Prenotazioni Campo Tennis - Bisignano</h1>
+  <p>Massimo 2 ore al giorno per utente. Le prenotazioni si resettano ogni lunedì.</p>
 
-    giorni.forEach(giorno => {
-      const cell = document.createElement("td");
-      const pren = prenotazioni?.[giorno]?.[orario] || "";
+  <table id="tabella">
+    <thead>
+      <tr>
+        <th>Orario</th>
+        <th>Lunedì</th>
+        <th>Martedì</th>
+        <th>Mercoledì</th>
+        <th>Giovedì</th>
+        <th>Venerdì</th>
+        <th>Sabato</th>
+        <th>Domenica</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Riga per ogni ora -->
+      <!-- Verrà generato via JS -->
+    </tbody>
+  </table>
 
-      if (pren) {
-        cell.textContent = pren;
-        cell.classList.add("prenotato");
-      } else {
-        const input = document.createElement("input");
-        input.placeholder = "Nome";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
 
-        const confermaBtn = document.createElement("button"); // AGGIUNTA
-        confermaBtn.textContent = "Conferma"; // AGGIUNTA
-        confermaBtn.style.marginTop = "4px"; // AGGIUNTA
-        confermaBtn.style.fontSize = "12px"; // AGGIUNTA
+    const firebaseConfig = {
+      apiKey: "AIzaSyCvd63i4yBCsRPntGrXVsxUbojG3NP6Ag4",
+      authDomain: "prenotazioni-tennis-bisigano.firebaseapp.com",
+      databaseURL: "https://prenotazioni-tennis-bisigano-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "prenotazioni-tennis-bisigano",
+      storageBucket: "prenotazioni-tennis-bisigano.appspot.com",
+      messagingSenderId: "256615773750",
+      appId: "1:256615773750:web:494813376350942bf18a97"
+    };
 
-        async function prenota() {
-          const nome = input.value.trim();
-          if (!nome) return;
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-          const count = contaPrenotazioni(prenotazioni, giorno, nome);
-          if (count >= 2) {
-            alert("Massimo 2 ore al giorno per utente.");
-            return;
+    const giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
+    const orari = Array.from({length: 16}, (_, i) => `${String(i+8).padStart(2,'0')}:00`);
+    const tableBody = document.querySelector("#tabella tbody");
+
+    const oggi = new Date();
+    const lunedi = new Date(oggi.setDate(oggi.getDate() - oggi.getDay() + 1));
+    const settimanaKey = `${lunedi.getFullYear()}-${String(lunedi.getMonth()+1).padStart(2,'0')}-${String(lunedi.getDate()).padStart(2,'0')}`;
+
+    let prenotazioni = {}; // Stato attuale prenotazioni
+
+    function creaTabella(prenotazioniLocal) {
+      prenotazioni = prenotazioniLocal || {};
+      tableBody.innerHTML = "";
+      orari.forEach(orario => {
+        const row = document.createElement("tr");
+        const oraCell = document.createElement("td");
+        oraCell.textContent = orario;
+        row.appendChild(oraCell);
+
+        giorni.forEach(giorno => {
+          const cell = document.createElement("td");
+          const pren = prenotazioni?.[giorno]?.[orario] || "";
+
+          if (pren) {
+            cell.textContent = pren;
+            cell.classList.add("prenotato");
+          } else {
+            const input = document.createElement("input");
+            input.placeholder = "Nome";
+            input.addEventListener("keydown", async e => {
+              if (e.key === "Enter") {
+                const nome = input.value.trim();
+                if (!nome) return;
+
+                const count = contaPrenotazioni(prenotazioni, giorno, nome);
+                if (count >= 2) {
+                  alert("Massimo 2 ore al giorno per utente.");
+                  return;
+                }
+
+                const cellRef = ref(db, `prenotazioni/${settimanaKey}/${giorno}/${orario}`);
+                await set(cellRef, nome);
+              }
+            });
+            cell.appendChild(input);
           }
 
-          const cellRef = ref(db, `prenotazioni/${settimanaKey}/${giorno}/${orario}`);
-          await set(cellRef, nome);
+          row.appendChild(cell);
+        });
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    function contaPrenotazioni(data, giorno, nome) {
+      if (!data?.[giorno]) return 0;
+      return Object.values(data[giorno]).filter(n => n === nome).length;
+    }
+
+    function aggiorna() {
+      const prenRef = ref(db, `prenotazioni/${settimanaKey}`);
+      onValue(prenRef, snapshot => {
+        creaTabella(snapshot.val());
+      });
+    }
+
+    aggiorna();
+
+    // --- Pulsante "Conferma Prenotazione" ---
+    const btnConferma = document.createElement("button");
+    btnConferma.textContent = "Conferma Prenotazione";
+    btnConferma.style.marginTop = "20px";
+    btnConferma.style.padding = "10px 20px";
+    btnConferma.style.fontSize = "16px";
+    document.body.appendChild(btnConferma);
+
+    btnConferma.addEventListener("click", async () => {
+      const inputs = document.querySelectorAll("tbody input");
+      let errore = false;
+
+      for (const input of inputs) {
+        const nome = input.value.trim();
+        if (!nome) continue;
+
+        const cell = input.parentElement;
+        const row = cell.parentElement;
+        const orario = row.firstChild.textContent;
+        const indiceGiorno = Array.from(row.children).indexOf(cell) - 1;
+        const giorno = giorni[indiceGiorno];
+
+        const count = contaPrenotazioni(prenotazioni, giorno, nome);
+        if (count >= 2) {
+          alert(`Massimo 2 ore al giorno per utente: ${nome} ha già 2 ore prenotate il ${giorno}.`);
+          errore = true;
+          continue;
         }
 
-        input.addEventListener("keydown", e => {
-          if (e.key === "Enter") prenota();
-        });
-        confermaBtn.addEventListener("click", prenota); // AGGIUNTA
-
-        const contenitore = document.createElement("div"); // AGGIUNTA
-        contenitore.appendChild(input); // AGGIUNTA
-        contenitore.appendChild(confermaBtn); // AGGIUNTA
-        cell.appendChild(contenitore); // AGGIUNTA
+        const cellRef = ref(db, `prenotazioni/${settimanaKey}/${giorno}/${orario}`);
+        try {
+          await set(cellRef, nome);
+        } catch(e) {
+          alert("Errore nel salvare la prenotazione. Riprova.");
+          errore = true;
+        }
       }
 
-      row.appendChild(cell);
+      if (!errore) {
+        alert("Prenotazioni confermate.");
+      }
     });
-
-    tableBody.appendChild(row);
-  });
-}
+  </script>
+</body>
+</html>
