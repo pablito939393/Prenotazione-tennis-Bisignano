@@ -74,9 +74,14 @@
     const orari = Array.from({length: 16}, (_, i) => `${String(i+8).padStart(2,'0')}:00`);
     const tableBody = document.querySelector("#tabella tbody");
 
+    // --- FIX calcolo lunedì della settimana (evita reset la domenica) ---
     const oggi = new Date();
-    const lunedi = new Date(oggi.setDate(oggi.getDate() - oggi.getDay() + 1));
+    let day = oggi.getDay();
+    if (day === 0) day = 7; // Domenica diventa 7
+    const lunedi = new Date(oggi);
+    lunedi.setDate(oggi.getDate() - day + 1);
     const settimanaKey = `${lunedi.getFullYear()}-${String(lunedi.getMonth()+1).padStart(2,'0')}-${String(lunedi.getDate()).padStart(2,'0')}`;
+    // --- FINE FIX ---
 
     let prenotazioni = {}; // Stato attuale prenotazioni
 
